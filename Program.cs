@@ -3,60 +3,122 @@ using Windows.Devices.Bluetooth;
 using Windows.Devices.Enumeration;
 using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using System.Collections;
+using System.Threading.Tasks;
+using System.Threading;
+using System.ComponentModel.Design;
+using Windows.Storage.Streams;
 
-
-namespace nb2_unpair_console
+namespace c_sharp_bci_prototype
 {
     /// <summary>
     /// Simple Bluetooth watcher 
     /// </summary>
     public static class Program
     {
-        static DeviceWatcher deviceWatcher;
+        // Devices found by watcher
+        private readonly static Hashtable s_foundDevices = new Hashtable();
         public static void Main()
         {
-            Console.WriteLine($"Detect bluetooth and force unpair NB2 devices.");
-            Console.WriteLine($"Press <ENTER> to quit.");
+            Console.WriteLine($"BCI C# NB2 prototype.");
 
-            string[] requestedProperties = { "System.Devices.Aep.DeviceAddress", "System.Devices.Aep.IsConnected" };
-            deviceWatcher = DeviceInformation.CreateWatcher("(System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\")", requestedProperties, DeviceInformationKind.AssociationEndpoint);
-            deviceWatcher.Added += DeviceWatcher_Added;
-            deviceWatcher.Removed += DeviceWatcher_Removed;
+            // Create a watcher
+            BluetoothLEAdvertisementWatcher watcher = new BluetoothLEAdvertisementWatcher();
+            watcher.ScanningMode = BluetoothLEScanningMode.Active;
+            watcher.Received += Watcher_ReceivedAsync;
 
-            deviceWatcher.Start();
-
-            DeviceInformationCollection pairedBluetoothDevices = DeviceInformation.FindAllAsync(BluetoothLEDevice.GetDeviceSelector()).AsTask().Result;
-            foreach (DeviceInformation pairedBluetoothDevice in pairedBluetoothDevices)
+            while (true)
             {
-                Console.WriteLine(pairedBluetoothDevice.Name);
+                Console.WriteLine("Starting BluetoothLEAdvertisementWatcher");
+                Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                watcher.Start();
+
+                // Run until we have found some devices to connect to
+                while (s_foundDevices.Count == 0)
+                {
+                    Thread.Sleep(5000);
+                }
+
+                Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                Console.WriteLine("Stopping BluetoothLEAdvertisementWatcher");
+
+                // We can't connect if watch running so stop it.
+                watcher.Stop();
+
+                Console.WriteLine();
+                Console.WriteLine($"Devices found = {s_foundDevices.Count}");
+                Console.WriteLine();
+                Console.WriteLine($"---------------------------------------");
+                //Console.WriteLine("Connecting and Reading data");
+
+                foreach (DictionaryEntry entry in s_foundDevices)
+                {
+                    BluetoothLEDevice device = entry.Value as BluetoothLEDevice;
+
+                    _ = ConnectAndReceiveSomeAsync(device);
+                }
+                Console.WriteLine($"---------------------------------------");
+
+                s_foundDevices.Clear();
             }
 
-            Console.ReadLine();
         }
 
-        private static void DeviceWatcher_Removed(DeviceWatcher sender, DeviceInformationUpdate args)
+        private static void Watcher_ReceivedAsync(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
         {
+            _ = ProcessWatcherReceivedAsync(sender, args);
         }
 
-        private static async void DeviceWatcher_Added(DeviceWatcher sender, DeviceInformation args)
+        private static async Task ProcessWatcherReceivedAsync(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
         {
-            string name = args.Name;
-            if(name.Contains("NB2"))
+            if (IsValidDevice(args))
             {
-                Console.WriteLine();
-                Console.WriteLine($"==========================");
-                Console.WriteLine($"NB2 device found: {name}");
+                //Console.WriteLine($"Found an NB2 eeg amplifyer :{args.BluetoothAddress:X}");
 
-                if (args.Pairing.IsPaired)
+                // Add it to list as a BluetoothLEDevice
+                //BluetoothLEDevice dev = BluetoothLEDevice.FromBluetoothAddress(args.BluetoothAddress, args.BluetoothAddressType);
+                BluetoothLEDevice dev = await BluetoothLEDevice.FromBluetoothAddressAsync(args.BluetoothAddress);
+                s_foundDevices.Add(args.BluetoothAddress, dev);
+            }
+        }
+
+        private static bool IsValidDevice(BluetoothLEAdvertisementReceivedEventArgs args)
+        {
+            if (args.Advertisement.LocalName.Contains($"NB2"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static async Task ConnectAndReceiveSomeAsync(BluetoothLEDevice device)
+        {
+            var services_result = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+
+            if (services_result.Status == GattCommunicationStatus.Success)
+            {
+                var list_of_services = services_result.Services;
+                // Pick up all temperature characteristics
+                foreach (GattDeviceService service in list_of_services)
                 {
-                    Console.WriteLine($"Paired! Try to unpair.");
+                    Console.WriteLine($"{service.Uuid}");
+                    Console.WriteLine($"===========================");
 
-                    var result = await args.Pairing.UnpairAsync();
-                    Console.WriteLine($"Unpairing result = {result.Status.ToString()}");
+                    var list_of_characteristics = service.GetAllCharacteristics();
+                    if (list_of_characteristics.Count > 0)
+                    {
+                        foreach (GattCharacteristic gatt_char in list_of_characteristics)
+                        {
+                            Console.WriteLine($"{gatt_char.Uuid}");
+                        }
+                    }
+                    Console.WriteLine($"===========================");
                 }
             }
 
         }
+
 
 
     }
