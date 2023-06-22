@@ -153,23 +153,23 @@ namespace c_sharp_bci_prototype
 
             if (services_result.Status == GattCommunicationStatus.Success)
             {
-                var list_of_services = services_result.Services;
-                foreach (GattDeviceService service in list_of_services)
-                {
-                    Console.WriteLine($"{service.Uuid}");
-                    Console.WriteLine($"===========================");
+                //var list_of_services = services_result.Services;
+                //foreach (GattDeviceService service in list_of_services)
+                //{
+                //    Console.WriteLine($"{service.Uuid}");
+                //    Console.WriteLine($"===========================");
 
-                    var characteristics_result = await service.GetCharacteristicsAsync();
-                    if (characteristics_result.Status == GattCommunicationStatus.Success)
-                    {
-                        var list_of_characteristics = characteristics_result.Characteristics;
-                        foreach (GattCharacteristic gatt_char in list_of_characteristics)
-                        {
-                            Console.WriteLine($"{gatt_char.Uuid}");
-                        }
-                    }
-                    Console.WriteLine($"===========================");
-                }
+                //    var characteristics_result = await service.GetCharacteristicsAsync();
+                //    if (characteristics_result.Status == GattCommunicationStatus.Success)
+                //    {
+                //        var list_of_characteristics = characteristics_result.Characteristics;
+                //        foreach (GattCharacteristic gatt_char in list_of_characteristics)
+                //        {
+                //            Console.WriteLine($"{gatt_char.Uuid}");
+                //        }
+                //    }
+                //    Console.WriteLine($"===========================");
+                //}
 
                 Console.WriteLine($"===========================");
                 Console.WriteLine($"^^^^^^^^^^^^^^^^^^^^^^^^^^^");
@@ -223,7 +223,7 @@ namespace c_sharp_bci_prototype
                 Console.WriteLine($"Control service uuid: {control_service.Uuid}");
                 Console.WriteLine($"Try to get access to command uuid: {CommandUuid}");
                 cr = await control_service.GetCharacteristicsForUuidAsync(CommandUuid);
-                Console.WriteLine($"Command characteristic result status: {cr.Status}");
+                Console.WriteLine($"GetCharacteristicsAsync result status: {cr.Status}");
                 gc = cr.Characteristics[0];
                 Console.WriteLine($"command characteristic uuid: {gc.Uuid}");
 
@@ -231,6 +231,54 @@ namespace c_sharp_bci_prototype
                 DataWriter dw;
                 byte[] byteArray;
                 GattWriteResult wr;
+
+                // start data acquisition
+                hexValues = start_acquisition_data_command.Split(' ');
+                byteArray = new byte[hexValues.Length];
+                for (int i = 0; i < hexValues.Length; i++)
+                {
+                    byteArray[i] = Convert.ToByte(hexValues[i], 16);
+                }
+                dw = new DataWriter();
+                dw.WriteBytes(byteArray);
+                wr = await gc.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
+                Console.WriteLine($"Write result status: {wr.Status}");
+
+                // stop data acquisition
+                hexValues = stop_acquisition_data_command.Split(' ');
+                byteArray = new byte[hexValues.Length];
+                for (int i = 0; i < hexValues.Length; i++)
+                {
+                    byteArray[i] = Convert.ToByte(hexValues[i], 16);
+                }
+                dw = new DataWriter();
+                dw.WriteBytes(byteArray);
+                wr = await gc.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
+                Console.WriteLine($"Write result status: {wr.Status}");
+
+                // turn off command
+                hexValues = turn_off_command.Split(' ');
+                byteArray = new byte[hexValues.Length];
+                for (int i = 0; i < hexValues.Length; i++)
+                {
+                    byteArray[i] = Convert.ToByte(hexValues[i], 16);
+                }
+                dw = new DataWriter();
+                dw.WriteBytes(byteArray);
+                wr = await gc.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
+                Console.WriteLine($"Write result status: {wr.Status}");
+
+                // connection close command
+                hexValues = connection_close_command.Split(' ');
+                byteArray = new byte[hexValues.Length];
+                for (int i = 0; i < hexValues.Length; i++)
+                {
+                    byteArray[i] = Convert.ToByte(hexValues[i], 16);
+                }
+                dw = new DataWriter();
+                dw.WriteBytes(byteArray);
+                wr = await gc.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
+                Console.WriteLine($"Write result status: {wr.Status}");
 
             }
 
