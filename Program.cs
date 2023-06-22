@@ -99,15 +99,15 @@ namespace c_sharp_bci_prototype
             if (services_result.Status == GattCommunicationStatus.Success)
             {
                 var list_of_services = services_result.Services;
-                // Pick up all temperature characteristics
                 foreach (GattDeviceService service in list_of_services)
                 {
                     Console.WriteLine($"{service.Uuid}");
                     Console.WriteLine($"===========================");
-
-                    var list_of_characteristics = service.GetAllCharacteristics();
-                    if (list_of_characteristics.Count > 0)
+                    
+                    var characteristics_result = await service.GetCharacteristicsAsync();
+                    if (characteristics_result.Status == GattCommunicationStatus.Success)
                     {
+                        var list_of_characteristics = characteristics_result.Characteristics;
                         foreach (GattCharacteristic gatt_char in list_of_characteristics)
                         {
                             Console.WriteLine($"{gatt_char.Uuid}");
