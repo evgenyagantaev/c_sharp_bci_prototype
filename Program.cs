@@ -284,6 +284,112 @@ namespace c_sharp_bci_prototype
 
         }
 
+
+        // Counters
+        static private UInt32 pktCounter = 0;
+        static private UInt32 errorsCount = 0;
+
+        // All channels enabled
+        static private UInt16 EnabledChannels = UInt16.MaxValue;
+
+        // Array of previous values
+        static Int32[] prev = new Int32[Pkt.ChannelsCount];
+        static private void ReceiveData(GattCharacteristic sender, GattValueChangedEventArgs args)
+        {
+            int val;
+            int offset = 0;
+            UInt32 code = 0;
+
+            // Array of decoded values
+            int[] array = new int[Pkt.ChannelsCount * Pkt.SamplesCount];
+            int pos = 0;
+
+            // Flag indicates that the channel is disabled
+            bool skip;
+
+            // An Indicate or Notify reported that the value has changed
+            var reader = DataReader.FromBuffer(args.CharacteristicValue);
+
+            // Parse the data however required
+            byte[] input = new byte[reader.UnconsumedBufferLength];
+
+            // Read input
+            reader.ReadBytes(input);
+
+            UInt16 counter = BitConverter.ToUInt16(input, input.Length - 2);
+
+            pktCounter++;
+
+            if (pktCounter != counter)
+            {
+                errorsCount++;
+            }
+
+            for (int i = 0; i < Pkt.SamplesCount; i++)
+            {
+                if (i != 0)
+                {
+                    code = BitConverter.ToUInt32(input, offset);
+                    offset += 4;
+                }
+
+                for (int ch = 0; ch < Pkt.ChannelsCount; ch++)
+                {
+                    skip = ((EnabledChannels >> ch) & 1) == 0;
+
+                    if (i == 0)
+                    {
+                        if (!skip)
+                        {
+                            val = (input[offset + 2] << 8) | (input[offset + 1] << 16) | (input[offset] << 24);
+                            val /= 256;
+                            offset += 3;
+                        }
+                        else
+                        {
+                            val = Int32.MaxValue;
+                        }
+                    }
+                    else
+                    {
+                        if (!skip)
+                        {
+                            switch ((code >> ch * 2) & 3)
+                            {
+                                case 0:
+                                    val = prev[ch] + (sbyte)input[offset];
+                                    offset += 1;
+                                    break;
+
+                                case 1:
+                                    val = prev[ch] + BitConverter.ToInt16(input, offset);
+                                    offset += 2;
+                                    break;
+
+                                case 2:
+                                    val = (input[offset + 2] << 8) | (input[offset + 1] << 16) | (input[offset] << 24);
+                                    val /= 256;
+                                    offset += 3;
+                                    break;
+
+                                default:
+                                    val = Int32.MaxValue;
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            val = Int32.MaxValue;
+                        }
+                    }
+
+                    array[pos] = val;
+                    prev[ch] = val;
+                    pos++;
+                }
+            }
+        }
+
         public struct BatteryProperties
         {
             public UInt16 Capacity;     // mAh
@@ -291,6 +397,12 @@ namespace c_sharp_bci_prototype
             public UInt16 Voltage;  // mV
             public Int16 Current;   // mA
             public Int16 Temperature; // °C * 10
+        }
+
+        public struct Pkt
+        {
+            public const int SamplesCount = 4;
+            public const int ChannelsCount = 16;
         }
 
         static Guid GenericAccess = new Guid("00001800-0000-1000-8000-00805f9b34fb");
