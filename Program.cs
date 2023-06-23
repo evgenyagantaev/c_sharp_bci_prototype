@@ -405,9 +405,7 @@ namespace c_sharp_bci_prototype
                     pos++;
                 }
             }
-            for(int i = 0; i < array.Length; i++)
-                Console.Write($" {array[0]}");
-            Console.WriteLine();
+            Console.WriteLine($" {array[4]}   {array[5]}   {array[12]}   {array[13]}   {array[14]}");
         }
 
         public struct BatteryProperties
