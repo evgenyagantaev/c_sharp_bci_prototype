@@ -147,6 +147,7 @@ namespace c_sharp_bci_prototype
             return false;
         }
 
+        [Obsolete]
         private static async Task ConnectAndReceiveSomeAsync(BluetoothLEDevice device)
         {
             var services_result = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached);
@@ -217,6 +218,24 @@ namespace c_sharp_bci_prototype
                 Console.WriteLine($"current: {batteryProperties.Current}");
                 Console.WriteLine($"temperature: {batteryProperties.Temperature}");
 
+                GattCharacteristic command_characteristic = null;
+                GattCharacteristic calibration_characteristic = null;
+                sr = await device.GetGattServicesForUuidAsync(ControlServiceUuid);
+                var crsr = await sr.Services[0].GetCharacteristicsAsync(0);
+                Console.WriteLine($"get all characteristics of control service result status: {cr.Status}");
+                var crs = crsr.Characteristics;
+                foreach ( var c in crs )
+                {
+                    if(c.Uuid == CommandUuid)
+                    {
+                        command_characteristic = c;
+                    }
+                    else if (c.Uuid == CalibrationUuid)
+                    {
+                        calibration_characteristic = c;
+                    }
+                }
+
                 sr = await device.GetGattServicesForUuidAsync(AcquisitionServiceUuid);
                 cr = await sr.Services[0].GetCharacteristicsForUuidAsync(DataUuid);
                 Console.WriteLine($"get data characteristic result status: {cr.Status}");
@@ -227,25 +246,13 @@ namespace c_sharp_bci_prototype
                 // subscribe on notification
                 data_characteristic.ValueChanged += ReceiveData;
 
-                sr = await device.GetGattServicesForUuidAsync(ControlServiceUuid);
-                Console.WriteLine($"Control service result status: {sr.Status}");
-                GattDeviceService control_service = sr.Services[0];
-                Console.WriteLine($"Control service uuid: {control_service.Uuid}");
-                Console.WriteLine($"Try to get access to command uuid: {CommandUuid}");
-                cr = await control_service.GetCharacteristicsForUuidAsync(CommandUuid);
-                Console.WriteLine($"GetCharacteristicsAsync result status: {cr.Status}");
-                gc = cr.Characteristics[0];
-                Console.WriteLine($"command characteristic uuid: {gc.Uuid}");
-
-                
-
                 DataWriter dw;
                 GattWriteResult wr;
 
                 // start data acquisition
                 dw = new DataWriter();
                 dw.WriteBytes(hexvals_to_bytes(start_acquisition_data_command));
-                wr = await gc.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
+                wr = await command_characteristic.WriteValueWithResultAsync(dw.DetachBuffer(), GattWriteOption.WriteWithResponse);
                 Console.WriteLine($"Write result status: {wr.Status}");
 
                 //// stop data acquisition
@@ -436,6 +443,7 @@ namespace c_sharp_bci_prototype
 
         static Guid ControlServiceUuid = new Guid("a183c5a7-1e93-8deb-a113-e8d5bb5581db");
         static Guid CommandUuid = new Guid("7395ca15-5997-5a1b-a138-75a7a573b8e5");
+        static Guid CalibrationUuid = new Guid("13553757-7d95-5fd9-91b3-87cf759abc79");
 
         static Guid AcquisitionServiceUuid = new Guid("5775ab91-ee53-57e1-a77b-1c87183bd78c");
         static Guid DataUuid = new Guid("75851135-953a-7739-c781-5a935531397a");
