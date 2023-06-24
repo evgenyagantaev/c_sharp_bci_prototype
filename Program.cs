@@ -11,6 +11,11 @@ using Windows.Storage.Streams;
 using System.Collections.Generic;
 using static LSL.liblsl;
 
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.IO;
+
 namespace c_sharp_bci_prototype
 {
     /// <summary>
@@ -30,6 +35,7 @@ namespace c_sharp_bci_prototype
         //private readonly static Hashtable s_foundDevices = new Hashtable();
 
         static List <BluetoothLEDevice> foundDevices = new List<BluetoothLEDevice>();
+        static TcpListener listener;
 
         //public static void Main(string[] args) 
         //{
@@ -94,6 +100,27 @@ namespace c_sharp_bci_prototype
         {
             Console.WriteLine($"BCI C# NB2 prototype.");
 
+            listener = new TcpListener(IPAddress.Any, 7523);
+            listener.Start();
+            Console.WriteLine("Server started...");
+            _ = accept_connection_async();
+
+            infoEEG = new StreamInfo("EegEmu", "EEG", 5, 250.0, channel_format_t.cf_float32, "EEGStreamEmulator");
+            outletEEG = new StreamOutlet(infoEEG);
+
+            String[] channels_of_interests = { "C3", "C4", "CZ", "FZ", "PZ" };
+            XMLElement chns = infoEEG.desc().append_child("channels");
+            foreach (var ch in channels_of_interests)
+            {
+                chns.append_child("channel")
+                    .append_child_value("label", ch)
+                    .append_child_value("unit", "microvolts")
+                    .append_child_value("type", "EEG");
+            }
+
+            infoIMP = new StreamInfo("ImpEmu", "IMP", 9, 250.0, channel_format_t.cf_float32, "IMPStreamEmulator");
+            outletIMP = new StreamOutlet(infoIMP);
+
             // Create a watcher
             BluetoothLEAdvertisementWatcher watcher = new BluetoothLEAdvertisementWatcher();
             watcher.ScanningMode = BluetoothLEScanningMode.Active;
@@ -125,6 +152,34 @@ namespace c_sharp_bci_prototype
 
             }
 
+        }
+
+        public static async Task accept_connection_async()
+        {
+            TcpClient client = await listener.AcceptTcpClientAsync();
+            Console.WriteLine("Client connected...");
+
+            NetworkStream stream = client.GetStream();
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+
+            while (true)
+            {
+                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                string message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                Console.WriteLine($"Received message: {message}");
+
+                byte[] response = Encoding.ASCII.GetBytes($"Response to {message}");
+                await stream.WriteAsync(response, 0, response.Length);
+            }
+
+            client.Close();
+            Console.WriteLine("Client disconnected...");
         }
 
         private static void Watcher_ReceivedAsync(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
@@ -163,24 +218,6 @@ namespace c_sharp_bci_prototype
 
             if (services_result.Status == GattCommunicationStatus.Success)
             {
-                //var list_of_services = services_result.Services;
-                //foreach (GattDeviceService service in list_of_services)
-                //{
-                //    Console.WriteLine($"{service.Uuid}");
-                //    Console.WriteLine($"===========================");
-
-                //    var characteristics_result = await service.GetCharacteristicsAsync();
-                //    if (characteristics_result.Status == GattCommunicationStatus.Success)
-                //    {
-                //        var list_of_characteristics = characteristics_result.Characteristics;
-                //        foreach (GattCharacteristic gatt_char in list_of_characteristics)
-                //        {
-                //            Console.WriteLine($"{gatt_char.Uuid}");
-                //        }
-                //    }
-                //    Console.WriteLine($"===========================");
-                //}
-
                 Console.WriteLine($"===========================");
                 Console.WriteLine($"^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
@@ -415,6 +452,8 @@ namespace c_sharp_bci_prototype
                 }
             }
             Console.WriteLine($" {array[4]}   {array[5]}   {array[12]}   {array[13]}   {array[14]}");
+            float[] dataEEG = new float[5] {(float)array[4], (float)array[5], (float)array[12], (float)array[13], (float)array[14]};
+            outletEEG.push_sample(dataEEG);
         }
 
         public struct BatteryProperties
