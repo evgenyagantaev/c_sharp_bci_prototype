@@ -9,6 +9,7 @@ using System.Threading;
 using System.ComponentModel.Design;
 using Windows.Storage.Streams;
 using System.Collections.Generic;
+using static LSL.liblsl;
 
 namespace c_sharp_bci_prototype
 {
@@ -17,6 +18,14 @@ namespace c_sharp_bci_prototype
     /// </summary>
     public static class Program
     {
+        static Thread update;
+        static Thread updateLSL;
+        static StreamInfo infoEEG;
+        static StreamInfo infoIMP;
+        static StreamOutlet outletEEG;
+        static StreamOutlet outletIMP;
+        static Dictionary<string, List<float>> lslData = new Dictionary<string, List<float>>();
+
         // Devices found by watcher
         //private readonly static Hashtable s_foundDevices = new Hashtable();
 
