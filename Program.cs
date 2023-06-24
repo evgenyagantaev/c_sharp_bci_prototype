@@ -15,6 +15,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.IO;
+using System.Runtime.InteropServices.ComTypes;
+using Windows.Media.Protection.PlayReady;
 
 namespace c_sharp_bci_prototype
 {
@@ -159,10 +161,20 @@ namespace c_sharp_bci_prototype
             TcpClient client = await listener.AcceptTcpClientAsync();
             Console.WriteLine("Client connected...");
 
+            
+            
+
+            
+
+            client.Close();
+            Console.WriteLine("Client disconnected...");
+        }
+
+        public static async Task read_message_async(TcpClient client)
+        {
             NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[1024];
             int bytesRead;
-
             while (true)
             {
                 bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
@@ -177,9 +189,6 @@ namespace c_sharp_bci_prototype
                 byte[] response = Encoding.ASCII.GetBytes($"Response to {message}");
                 await stream.WriteAsync(response, 0, response.Length);
             }
-
-            client.Close();
-            Console.WriteLine("Client disconnected...");
         }
 
         private static void Watcher_ReceivedAsync(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
