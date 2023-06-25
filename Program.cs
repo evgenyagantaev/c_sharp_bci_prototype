@@ -9,86 +9,14 @@ using System.Threading;
 using System.ComponentModel.Design;
 using Windows.Storage.Streams;
 using System.Collections.Generic;
-using static LSL.liblsl;
+
+
 
 namespace c_sharp_bci_prototype
 {
-    /// <summary>
-    /// Simple Bluetooth watcher 
-    /// </summary>
     public static class Program
     {
-        static Thread update;
-        static Thread updateLSL;
-        static StreamInfo infoEEG;
-        static StreamInfo infoIMP;
-        static StreamOutlet outletEEG;
-        static StreamOutlet outletIMP;
-        static Dictionary<string, List<float>> lslData = new Dictionary<string, List<float>>();
-
-        // Devices found by watcher
-        //private readonly static Hashtable s_foundDevices = new Hashtable();
-
         static List <BluetoothLEDevice> foundDevices = new List<BluetoothLEDevice>();
-
-        //public static void Main(string[] args) 
-        //{
-        //    _ = async_operation_test();
-
-        //    int i = 0;
-        //    while (true) 
-        //    {
-        //        Console.WriteLine("Main " + i.ToString());
-        //        Thread.Sleep(1000); // Wait for 1 second
-        //        i++;
-        //    }
-        //}
-
-        //public static async Task async_operation_test() // асинхронный метод
-        //{
-        //    BeforeCall();
-        //    Task task = OperationAsync(); //асинхронная операция
-        //    //Task task = Task.Delay(7000); //асинхронная операция
-        //    AfterCall();
-        //    await task;
-        //    AfterAwait();
-        //}
-
-        //private static void BeforeCall()
-        //{
-        //    for(int i=0; i<3; i++)
-        //    {
-        //        Console.WriteLine("BeforeCall " + i.ToString());
-        //        Thread.Sleep(1000); // Wait for 1 second
-        //    }
-        //}
-
-        //private static void AfterCall()
-        //{
-        //    for (int i = 0; i < 3; i++)
-        //    {
-        //        Console.WriteLine("AfterCall " + i.ToString());
-        //        Thread.Sleep(1000); // Wait for 1 second
-        //    }
-        //}
-
-        //private static void AfterAwait()
-        //{
-        //    for (int i = 0; i < 3; i++)
-        //    {
-        //        Console.WriteLine("AfterAwait " + i.ToString());
-        //        Thread.Sleep(1000); // Wait for 1 second
-        //    }
-        //}
-
-        //public static async Task OperationAsync()
-        //{
-        //    for (int i = 0; i < 7; i++)
-        //    {
-        //        Console.WriteLine("OperationAsync " + i.ToString());
-        //        await Task.Delay(1000);
-        //    }
-        //}
 
         public static void Main()
         {
@@ -163,23 +91,6 @@ namespace c_sharp_bci_prototype
 
             if (services_result.Status == GattCommunicationStatus.Success)
             {
-                //var list_of_services = services_result.Services;
-                //foreach (GattDeviceService service in list_of_services)
-                //{
-                //    Console.WriteLine($"{service.Uuid}");
-                //    Console.WriteLine($"===========================");
-
-                //    var characteristics_result = await service.GetCharacteristicsAsync();
-                //    if (characteristics_result.Status == GattCommunicationStatus.Success)
-                //    {
-                //        var list_of_characteristics = characteristics_result.Characteristics;
-                //        foreach (GattCharacteristic gatt_char in list_of_characteristics)
-                //        {
-                //            Console.WriteLine($"{gatt_char.Uuid}");
-                //        }
-                //    }
-                //    Console.WriteLine($"===========================");
-                //}
 
                 Console.WriteLine($"===========================");
                 Console.WriteLine($"^^^^^^^^^^^^^^^^^^^^^^^^^^^");
@@ -309,18 +220,8 @@ namespace c_sharp_bci_prototype
         // Array of previous values
         static Int32[] prev = new Int32[Pkt.ChannelsCount];
 
-
-        //static private void ReceiveData(GattCharacteristic sender, GattValueChangedEventArgs args)
-        //{
-        //    Console.WriteLine($"value changed: {counter}");
-        //    counter++;
-        //}
-
-        static int counter = 0;
         static private void ReceiveData(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
-            //Console.WriteLine($"value changed: {Program.counter}");
-            //Program.counter++;
 
             int val;
             int offset = 0;
@@ -414,6 +315,8 @@ namespace c_sharp_bci_prototype
                     pos++;
                 }
             }
+            // SAMPLES HERE >>>>>>>>>>>>>>>>
+            // c3 c4 fz cz pz
             Console.WriteLine($" {array[4]}   {array[5]}   {array[12]}   {array[13]}   {array[14]}");
         }
 
