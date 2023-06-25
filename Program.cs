@@ -18,6 +18,11 @@ using System.IO;
 using System.Runtime.InteropServices.ComTypes;
 using Windows.Media.Protection.PlayReady;
 
+using System.Linq;
+using Newtonsoft.Json;
+using Windows.Data.Json;
+using Newtonsoft.Json.Linq;
+
 namespace c_sharp_bci_prototype
 {
     /// <summary>
@@ -33,10 +38,9 @@ namespace c_sharp_bci_prototype
         static StreamOutlet outletIMP;
         static Dictionary<string, List<float>> lslData = new Dictionary<string, List<float>>();
 
-        // Devices found by watcher
-        //private readonly static Hashtable s_foundDevices = new Hashtable();
 
-        static List <BluetoothLEDevice> foundDevices = new List<BluetoothLEDevice>();
+
+        static List<BluetoothLEDevice> foundDevices = new List<BluetoothLEDevice>();
         static TcpListener listener;
 
         //public static void Main(string[] args) 
@@ -107,6 +111,11 @@ namespace c_sharp_bci_prototype
             Console.WriteLine("Server started...");
             _ = accept_connection_async();
 
+            while (true)
+            {
+
+            }
+
             infoEEG = new StreamInfo("EegEmu", "EEG", 5, 250.0, channel_format_t.cf_float32, "EEGStreamEmulator");
             outletEEG = new StreamOutlet(infoEEG);
 
@@ -133,7 +142,7 @@ namespace c_sharp_bci_prototype
 
             while (foundDevices.Count == 0)
             {
-                Thread.Sleep( 100 );   
+                Thread.Sleep(100);
             }
 
             Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
@@ -161,34 +170,106 @@ namespace c_sharp_bci_prototype
             TcpClient client = await listener.AcceptTcpClientAsync();
             Console.WriteLine("Client connected...");
 
-            
-            
-
-            
+            await read_message_loop_async(client);
 
             client.Close();
             Console.WriteLine("Client disconnected...");
         }
 
-        public static async Task read_message_async(TcpClient client)
+        public static async Task read_message_loop_async(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[2048];
             int bytesRead;
-            while (true)
+            bool stop_command_received = false;
+
+            while (!stop_command_received)
             {
-                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                if (bytesRead == 0)
+                // Receive the length of the command
+                byte[] commandLengthBytes = new byte[4];
+                bytesRead = await stream.ReadAsync(commandLengthBytes, 0, 4);
+                if (bytesRead == 4)
                 {
-                    break;
+                    int commandLength = BitConverter.ToInt32(commandLengthBytes, 0);
+                    // Receive the answer itself
+                    byte[] commandBytes = new byte[commandLength];
+                    bytesRead = await stream.ReadAsync(commandBytes, 0, commandLength);
+                    if (bytesRead == commandLength)
+                    {
+                        string command = Encoding.ASCII.GetString(commandBytes, 0, commandLength);
+                        Console.WriteLine($"Received message: {command}");
+
+                        stop_command_received = await process_message_async(command, stream);
+                    }
                 }
 
-                string message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                Console.WriteLine($"Received message: {message}");
-
-                byte[] response = Encoding.ASCII.GetBytes($"Response to {message}");
-                await stream.WriteAsync(response, 0, response.Length);
             }
+        }
+
+        static async Task<bool> process_message_async(string message, NetworkStream stream)
+        {
+            JObject json_obj = JObject.Parse(message);
+
+            // Creating a JSON object
+            var json_command1_responce = new
+            {
+                Cmd = 1,
+                Data = new
+                {
+                    Devices = new[] { "testnb2" },
+                    ErrorCode = 0
+                }
+            };
+            var json_command2_responce = new
+            {
+                Cmd = 2,
+                Data = new
+                {
+                    ErrorCode = 0,
+                    IsMultySignal = false,
+                    StreamNames = new
+                    {
+                        EEG = "EEGStreamEmulator",
+                        IMP = "IMPStreamEmulator"
+                    },
+                    Electrodes = new
+                    {
+                        EEG = new[] { "FZ", "C3", "CZ", "C4", "PZ" },
+                        IMP = new[] { "FZ", "C3", "CZ", "C4", "PZ", "GND", "REF" }
+                    },
+                    DeviceInfo = new
+                    {
+                        DeviceName = "testnb2",
+                        Health = 73,
+                        DeviceType = 0
+                    }
+                }
+            };
+
+            string string_command_responce;
+            if (json_obj.SelectToken("Cmd").Value<int>() == 2)
+            {
+                // Serializing the JSON object to a string
+                string_command_responce = JsonConvert.SerializeObject(json_command2_responce);
+            }
+            else
+            {
+                // Serializing the JSON object to a string
+                string_command_responce = JsonConvert.SerializeObject(json_command1_responce);
+            }
+
+            Console.WriteLine("Length of json command string: " + string_command_responce.Length);
+
+            byte[] bytes_response = Encoding.ASCII.GetBytes(string_command_responce);
+            // Convert the length to a sequence of bytes
+            byte[] lengthBytes = BitConverter.GetBytes((Int32)(bytes_response.Length));
+
+            // Send the responce length bytes
+            await stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
+            // Send the responce itself
+            await stream.WriteAsync(bytes_response, 0, bytes_response.Length);
+
+            return false;
         }
 
         private static void Watcher_ReceivedAsync(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
@@ -460,8 +541,8 @@ namespace c_sharp_bci_prototype
                     pos++;
                 }
             }
-            Console.WriteLine($" {array[4]}   {array[5]}   {array[12]}   {array[13]}   {array[14]}");
-            float[] dataEEG = new float[5] {(float)array[4], (float)array[5], (float)array[12], (float)array[13], (float)array[14]};
+            Console.WriteLine($" {array[12]}   {array[4]}   {array[13]}   {array[5]}   {array[14]}");
+            float[] dataEEG = new float[5] {(float)array[12], (float)array[4], (float)array[13], (float)array[5], (float)array[14]};
             outletEEG.push_sample(dataEEG);
         }
 
